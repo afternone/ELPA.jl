@@ -60,14 +60,14 @@ function lpa_deletenode!(g, m, u)
   for v in keys(g[u])
     push!(active_lbls, m[v])
   end
+  deletenode!(g, u)
+  delete!(m, u)
   for v in keys(g)
     if in(m[v], active_lbls)
       push!(active_nodes, v)
       m[v] = v
     end
   end
-  deletenode!(g, u)
-  delete!(m, u)
   update!(g, m, active_nodes)
 end
 
