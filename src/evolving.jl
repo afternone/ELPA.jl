@@ -1,0 +1,152 @@
+function vote{V,W}(g::Graph{V,W}, m::Dict{V,Int}, u::V)
+	c = Dict{V,Int}()
+	max_cnt = 0
+	for neigh in keys(g[u])
+		neigh_comm = m[neigh]
+		c[neigh_comm] = get(c, neigh_comm, 0) + 1
+		if c[neigh_comm] > max_cnt
+			max_cnt = c[neigh_comm]
+		end
+	end
+	random_order = collect(keys(c))
+	shuffle!(random_order)
+	for lbl in random_order
+		if c[lbl] == max_cnt
+			return lbl
+		end
+	end
+end
+
+function update!(g, m, active_nodes)
+  while !isempty(active_nodes)
+    random_order = collect(active_nodes)
+    shuffle!(random_order)
+    for u in random_order
+      old_comm = m[u]
+      new_comm = vote(g, m, u)
+      if new_comm != old_comm
+        for v in keys(g[u])
+          push!(active_nodes, v)
+          m[u] = new_comm
+        end
+      else
+        delete!(active_nodes, u)
+      end
+    end
+  end
+end
+
+function lpa_addnode!(g, m, u)
+  if !haskey(g, u)
+    addnode!(g, u)
+    m[u] = u
+  end
+end
+
+function lpa_deletenode1!(g, m, u)
+  active_nodes = Set{keytype(g)}()
+  for v in keys(g[u])
+    push!(active_nodes, v)
+    m[v] = v
+  end
+  deletenode!(g, u)
+  delete!(m, u)
+  update!(g, m, active_nodes)
+end
+
+function lpa_deletenode!(g, m, u)
+  active_nodes = Set{keytype(g)}()
+  active_lbls = IntSet()
+  for v in keys(g[u])
+    push!(active_lbls, m[v])
+  end
+  for v in keys(g)
+    if in(m[v], active_lbls)
+      push!(active_nodes, v)
+      m[v] = v
+    end
+  end
+  deletenode!(g, u)
+  delete!(m, u)
+  update!(g, m, active_nodes)
+end
+
+function lpa_addedge1!(g, m, u, v)
+  lpa_addnode!(g, m, u)
+  lpa_addnode!(g, m, v)
+  active_nodes = Set{keytype(g)}()
+  if m[u] != m[v]
+    for i in keys(g[u])
+      push!(active_nodes, i)
+      m[i] = i
+    end
+    for i in keys(g[v])
+      push!(active_nodes, i)
+      m[i] = i
+    end
+    push!(active_nodes, u)
+    m[u] = u
+    push!(active_nodes, v)
+    m[v] = v
+    addedge!(g, u, v)
+    update!(g, m, active_nodes)
+  else
+  	addedge!(g, u, v)
+  end
+end
+
+function lpa_addedge!(g, m, u, v)
+  lpa_addnode!(g, m, u)
+  lpa_addnode!(g, m, v)
+  active_nodes = Set{keytype(g)}()
+  if m[u] != m[v]
+    for i in keys(g)
+      if m[i] == m[u] || m[i] == m[v]
+        push!(active_nodes, i)
+        m[i] = i
+      end
+    end
+    addedge!(g, u, v)
+    update!(g, m, active_nodes)
+  else
+  	addedge!(g, u, v)
+  end
+end
+
+function lpa_deleteedge1!(g, m, u, v)
+  active_nodes = Set{keytype(g)}()
+  if m[u] == m[v]
+    for i in keys(g[u])
+      push!(active_nodes, i)
+      m[i] = i
+    end
+    for i in keys(g[v])
+      push!(active_nodes, i)
+      m[i] = i
+    end
+    push!(active_nodes, u)
+    m[u] = u
+    push!(active_nodes, v)
+    m[v] = v
+    deleteedge!(g, u, v)
+    update!(g, m, active_nodes)
+  else
+  	deleteedge!(g, u, v)
+  end
+end
+
+function lpa_deleteedge!(g, m, u, v)
+  active_nodes = Set{keytype(g)}()
+  if m[u] == m[v]
+    for i in keys(g)
+      if m[i] == m[u]
+        push!(active_nodes, i)
+        m[i] = i
+      end
+    end
+    deleteedge!(g, u, v)
+    update!(g, m, active_nodes)
+  else
+  	deleteedge!(g, u, v)
+  end
+end
