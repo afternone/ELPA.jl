@@ -22,7 +22,11 @@ function vote{V,W}(g::Graph{V,W}, m::Dict{V,Int}, u::V)
 end
 
 function update!(g, m, active_nodes)
+  num_active_nodes = 0
   while !isempty(active_nodes)
+    if length(active_nodes) > num_active_nodes
+        num_active_nodes = length(active_nodes)
+    end
     random_order = collect(active_nodes)
     shuffle!(random_order)
     for u in random_order
@@ -38,6 +42,7 @@ function update!(g, m, active_nodes)
       end
     end
   end
+  num_active_nodes
 end
 
 function lpa_addnode!(g, m, u)
@@ -93,9 +98,10 @@ function lpa_addedge1!(g, m, u, v)
     push!(active_nodes, v)
     m[v] = v
     addedge!(g, u, v)
-    update!(g, m, active_nodes)
+    return update!(g, m, active_nodes)
   else
   	addedge!(g, u, v)
+    return 0
   end
 end
 
@@ -111,9 +117,10 @@ function lpa_addedge!(g, m, u, v)
       end
     end
     addedge!(g, u, v)
-    update!(g, m, active_nodes)
+    return update!(g, m, active_nodes)
   else
   	addedge!(g, u, v)
+    return 0
   end
 end
 
@@ -149,8 +156,9 @@ function lpa_deleteedge!(g, m, u, v)
       end
     end
     deleteedge!(g, u, v)
-    update!(g, m, active_nodes)
+    return update!(g, m, active_nodes)
   else
   	deleteedge!(g, u, v)
+    return 0
   end
 end
