@@ -1,20 +1,24 @@
 function vote{V,W}(g::Graph{V,W}, m::Dict{V,Int}, u::V)
 	c = Dict{V,Int}()
 	max_cnt = 0
-	for neigh in keys(g[u])
-		neigh_comm = m[neigh]
-		c[neigh_comm] = get(c, neigh_comm, 0) + 1
-		if c[neigh_comm] > max_cnt
-			max_cnt = c[neigh_comm]
-		end
-	end
-	random_order = collect(keys(c))
-	shuffle!(random_order)
-	for lbl in random_order
-		if c[lbl] == max_cnt
-			return lbl
-		end
-	end
+    if !isempty(keys(g[u]))
+    	for neigh in keys(g[u])
+    		neigh_comm = m[neigh]
+    		c[neigh_comm] = get(c, neigh_comm, 0) + 1
+    		if c[neigh_comm] > max_cnt
+    			max_cnt = c[neigh_comm]
+    		end
+    	end
+    	random_order = collect(keys(c))
+    	shuffle!(random_order)
+    	for lbl in random_order
+    		if c[lbl] == max_cnt
+    			return lbl
+    		end
+    	end
+    else
+        return m[u]
+    end
 end
 
 function update!(g, m, active_nodes)
