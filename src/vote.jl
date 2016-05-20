@@ -187,21 +187,22 @@ end
 function lpa_addedge!(g, m, c, u, v)
   lpa_addnode!(g, m, u)
   lpa_addnode!(g, m, v)
-  active_nodes = Set{keytype(g)}()
-  if m[u] != m[v]
-    for i in keys(g)
-      if m[i] == m[u] || m[i] == m[v]
-        push!(active_nodes, i)
-        m[i] = i
+  if !haskey(g[u], v)
+      active_nodes = Set{keytype(g)}()
+      if m[u] != m[v]
+        for i in keys(g)
+          if m[i] == m[u] || m[i] == m[v]
+            push!(active_nodes, i)
+            m[i] = i
+          end
+        end
+        addedge!(g, u, v)
+    	all_active_nodes = copy(active_nodes)
+    	pre_update!(g, m, c, active_nodes)
+        update!(g, m, c, all_active_nodes)
+      else
+      	addedge!(g, u, v)
       end
-    end
-    addedge!(g, u, v)
-	all_active_nodes = copy(active_nodes)
-	pre_update!(g, m, c, active_nodes)
-    update!(g, m, c, all_active_nodes)
-  else
-  	addedge!(g, u, v)
-    return 0
   end
 end
 
