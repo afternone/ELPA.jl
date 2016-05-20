@@ -21,6 +21,34 @@ function vote{V,W}(g::Graph{V,W}, m::Dict{V,Int}, u::V)
     end
 end
 
+function vote1{V,W}(g::Graph{V,W}, m::Dict{V,Int}, u::V, all_active_nodes)
+	c = Dict{V,Int}()
+	max_cnt = 0
+    if !isempty(keys(g[u]))
+    	for neigh in keys(g[u])
+			if in(neigh, all_active_nodes)
+	    		neigh_comm = m[neigh]
+	    		c[neigh_comm] = get(c, neigh_comm, 0) + 1
+	    		if c[neigh_comm] > max_cnt
+	    			max_cnt = c[neigh_comm]
+	    		end
+			end
+    	end
+		if isempty(c)
+			return m[u]
+		end
+    	random_order = collect(keys(c))
+    	shuffle!(random_order)
+    	for lbl in random_order
+    		if c[lbl] == max_cnt
+    			return lbl
+    		end
+    	end
+    else
+        return m[u]
+    end
+end
+
 function update!(g, m, active_nodes)
   num_active_nodes = 0
   while !isempty(active_nodes)
@@ -43,6 +71,28 @@ function update!(g, m, active_nodes)
     end
   end
   num_active_nodes
+end
+
+function update1!(g, m, active_nodes)
+  all_active_nodes = copy(active_nodes)
+  while !isempty(active_nodes)
+    random_order = collect(active_nodes)
+    shuffle!(random_order)
+    for u in random_order
+      old_comm = m[u]
+      new_comm = vote1(g, m, u, all_active_nodes)
+      if new_comm != old_comm
+        for v in keys(g[u])
+		  if in(v, all_active_nodes)
+	          push!(active_nodes, v)
+	          m[u] = new_comm
+		  end
+        end
+      else
+        delete!(active_nodes, u)
+      end
+    end
+  end
 end
 
 function lpa_addnode!(g, m, u)
@@ -77,6 +127,7 @@ function lpa_deletenode!(g, m, u)
       m[v] = v
     end
   end
+  update1!(g, m, active_nodes)
   update!(g, m, active_nodes)
 end
 
@@ -98,6 +149,7 @@ function lpa_addedge1!(g, m, u, v)
     push!(active_nodes, v)
     m[v] = v
     addedge!(g, u, v)
+	update1!(g, m, active_nodes)
     return update!(g, m, active_nodes)
   else
   	addedge!(g, u, v)
@@ -117,6 +169,7 @@ function lpa_addedge!(g, m, u, v)
       end
     end
     addedge!(g, u, v)
+	update1!(g, m, active_nodes)
     return update!(g, m, active_nodes)
   else
   	addedge!(g, u, v)
@@ -156,6 +209,7 @@ function lpa_deleteedge!(g, m, u, v)
       end
     end
     deleteedge!(g, u, v)
+	update1!(g, m, active_nodes)
     return update!(g, m, active_nodes)
   else
   	deleteedge!(g, u, v)
