@@ -148,7 +148,11 @@ function vote!(g, m, c::NeighComm, u)
 end
 
 function update!(g, m, c::NeighComm, active_nodes)
+  num_active_nodes = 0
   while !isempty(active_nodes)
+    if length(active_nodes) > num_active_nodes
+        num_active_nodes = length(active_nodes)
+    end
     random_order = collect(active_nodes)
     shuffle!(random_order)
     for u in random_order
@@ -164,6 +168,7 @@ function update!(g, m, c::NeighComm, active_nodes)
       end
     end
   end
+  num_active_nodes
 end
 
 function lpa_addnode!(g, m, u)
@@ -173,8 +178,9 @@ function lpa_addnode!(g, m, u)
   end
 end
 
-function lpa_deletenode!(g, m, c, u, active_lbls, active_nodes)
+function lpa_deletenode!(g, m, c, u, active_lbls, pre_active_nodes, active_nodes)
   if haskey(g, u)
+      empty!(pre_active_nodes)
       empty!(active_nodes)
       empty!(active_lbls)
       for v in keys(g[u])
@@ -184,13 +190,15 @@ function lpa_deletenode!(g, m, c, u, active_lbls, active_nodes)
       delete!(m, u)
       for v in keys(g)
         if in(m[v], active_lbls)
+          push!(pre_active_nodes, v)
           push!(active_nodes, v)
           m[v] = v
         end
       end
-      all_active_nodes = copy(active_nodes)
-      pre_update!(g, m, c, active_nodes, all_active_nodes)
-      update!(g, m, c, all_active_nodes)
+      pre_update!(g, m, c, pre_active_nodes, active_nodes)
+      return update!(g, m, c, active_nodes)
+  else
+      return 0
   end
 end
 
@@ -212,30 +220,39 @@ function lpa_addedge!(g, m, c, u, v, pre_active_nodes, active_nodes)
         addedge!(g, u, v)
     	#all_active_nodes = copy(active_nodes)
     	pre_update!(g, m, c, pre_active_nodes, active_nodes)
-        update!(g, m, c, active_nodes)
+        return update!(g, m, c, active_nodes)
       else
       	addedge!(g, u, v)
+        return 0
       end
+  else
+      return 0
   end
 end
 
-function lpa_deleteedge!(g, m, c, u, v)
+function lpa_deleteedge!(g, m, c, u, v, pre_active_nodes, active_nodes)
   if haskey(g, u) && haskey(g[u], v)
-      active_nodes = Set{keytype(g)}()
+      empty!(pre_active_nodes)
+      empty!(active_nodes)
+      #active_nodes = Set{keytype(g)}()
       if m[u] == m[v]
         for i in keys(g)
           if m[i] == m[u]
+            push!(pre_active_nodes, i)
             push!(active_nodes, i)
             m[i] = i
           end
         end
         deleteedge!(g, u, v)
-    	all_active_nodes = copy(active_nodes)
-    	pre_update!(g, m, c, active_nodes, all_active_nodes)
-        update!(g, m, c, all_active_nodes)
+    	#all_active_nodes = copy(active_nodes)
+    	pre_update!(g, m, c, pre_active_nodes, active_nodes)
+        return update!(g, m, c, active_nodes)
       else
       	deleteedge!(g, u, v)
+        return 0
       end
+  else
+      return 0
   end
 end
 
