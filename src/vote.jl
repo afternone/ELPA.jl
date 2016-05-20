@@ -185,13 +185,12 @@ function lpa_deletenode!(g, m, c, u)
   end
 end
 
-function lpa_addedge!(g, m, c, u, v)
-  #!haskey(g, u) && lpa_addnode!(g, m, u)
-  #!haskey(g, v) && lpa_addnode!(g, m, v)
+function lpa_addedge!(g, m, c, u, v, active_nodes)
   lpa_addnode!(g, m, u)
   lpa_addnode!(g, m, v)
-  #if !haskey(g[u], v)
-      active_nodes = Set{keytype(g)}()
+  if !haskey(g[u], v)
+      #active_nodes = Set{keytype(g)}()
+      empty!(active_nodes)
       if m[u] != m[v]
         for i in keys(g)
           if m[i] == m[u] || m[i] == m[v]
@@ -206,7 +205,7 @@ function lpa_addedge!(g, m, c, u, v)
       else
       	addedge!(g, u, v)
       end
-  #end
+  end
 end
 
 function lpa_deleteedge!(g, m, c, u, v)
