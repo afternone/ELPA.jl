@@ -1,3 +1,5 @@
+using StatsBase
+
 typealias  Graph{V,W} Dict{V, Dict{V, W}}
 
 function addnode!{V,W}(g::Graph{V,W}, u::V)
@@ -53,6 +55,13 @@ function range_shuffle!(r::UnitRange, a::AbstractVector)
     end
 end
 
+function range_shuffle!(r, a::AbstractVector)
+    @inbounds for i=r:-1:2
+        j = StatsBase.randi(i)
+        a[i],a[j] = a[j],a[i]
+    end
+end
+
 """Return the most frequency label."""
 function pre_vote!(g, m, c::NeighComm, u, all_active_nodes)
     @inbounds for i=1:c.neigh_last-1
@@ -78,7 +87,7 @@ function pre_vote!(g, m, c::NeighComm, u, all_active_nodes)
         end
     end
     # ties breaking randomly
-    range_shuffle!(1:c.neigh_last-1, c.neigh_pos)
+    range_shuffle!(c.neigh_last-1, c.neigh_pos)
     for lbl in c.neigh_pos
       if c.neigh_cnt[lbl] == max_cnt
         return lbl
@@ -130,7 +139,7 @@ function vote!(g, m, c::NeighComm, u)
         end
     end
     # ties breaking randomly
-    range_shuffle!(1:c.neigh_last-1, c.neigh_pos)
+    range_shuffle!(c.neigh_last-1, c.neigh_pos)
     for lbl in c.neigh_pos
       if c.neigh_cnt[lbl] == max_cnt
         return lbl
@@ -164,10 +173,10 @@ function lpa_addnode!(g, m, u)
   end
 end
 
-function lpa_deletenode!(g, m, c, u)
+function lpa_deletenode!(g, m, c, u, active_lbls, active_nodes)
   if haskey(g, u)
-      active_nodes = Set{keytype(g)}()
-      active_lbls = IntSet()
+      empty!(active_nodes)
+      empty!(active_lbls)
       for v in keys(g[u])
         push!(active_lbls, m[v])
       end
@@ -185,7 +194,7 @@ function lpa_deletenode!(g, m, c, u)
   end
 end
 
-function lpa_addedge!(g, m, c, u, v, active_nodes)
+function lpa_addedge!(g, m, c, u, v, active_nodes, all_active_nodes)
   lpa_addnode!(g, m, u)
   lpa_addnode!(g, m, v)
   if !haskey(g[u], v)
