@@ -127,8 +127,9 @@ function lpa_deletenode!(g, m, u)
       m[v] = v
     end
   end
+  all_active_nodes = copy(active_nodes)
   update1!(g, m, active_nodes)
-  update!(g, m, active_nodes)
+  update!(g, m, all_active_nodes)
 end
 
 function lpa_addedge1!(g, m, u, v)
@@ -149,8 +150,9 @@ function lpa_addedge1!(g, m, u, v)
     push!(active_nodes, v)
     m[v] = v
     addedge!(g, u, v)
+	all_active_nodes = copy(active_nodes)
 	update1!(g, m, active_nodes)
-    return update!(g, m, active_nodes)
+    return update!(g, m, all_active_nodes)
   else
   	addedge!(g, u, v)
     return 0
@@ -169,8 +171,9 @@ function lpa_addedge!(g, m, u, v)
       end
     end
     addedge!(g, u, v)
+	all_active_nodes = copy(active_nodes)
 	update1!(g, m, active_nodes)
-    return update!(g, m, active_nodes)
+    return update!(g, m, all_active_nodes)
   else
   	addedge!(g, u, v)
     return 0
@@ -209,8 +212,9 @@ function lpa_deleteedge!(g, m, u, v)
       end
     end
     deleteedge!(g, u, v)
+	all_active_nodes = copy(active_nodes)
 	update1!(g, m, active_nodes)
-    return update!(g, m, active_nodes)
+    return update!(g, m, all_active_nodes)
   else
   	deleteedge!(g, u, v)
     return 0
