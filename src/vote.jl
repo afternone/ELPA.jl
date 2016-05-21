@@ -203,31 +203,51 @@ function lpa_deletenode!(g, m, c, u, active_lbls, pre_active_nodes, active_nodes
 end
 
 function lpa_addedge!(g, m, c, u, v, pre_active_nodes, active_nodes)
-  lpa_addnode!(g, m, u)
-  lpa_addnode!(g, m, v)
-  if !haskey(g[u], v)
-      #active_nodes = Set{keytype(g)}()
-      empty!(pre_active_nodes)
-      empty!(active_nodes)
-      if m[u] != m[v]
-        for i in keys(g)
-          if m[i] == m[u] || m[i] == m[v]
-            push!(pre_active_nodes, i)
-            push!(active_nodes, i)
-            m[i] = i
-          end
+    lpa_addnode!(g, m, u)
+    lpa_addnode!(g, m, v)
+    if !haskey(g[u], v)
+        u_comm = m[u]
+        v_comm = m[v]
+        if u_comm != v_comm
+            ku_int = 0
+            ku_ext = 0
+            kv_int = 0
+            kv_ext = 0
+            for neigh in keys(g[u])
+                if m[neigh] == u_comm
+                    ku_int += 1
+                else
+                    ku_ext += 1
+                end
+            end
+            for neigh in keys(g[v])
+                if m[neigh] == v_comm
+                    kv_int += 1
+                else
+                    kv_ext += 1
+                end
+            end
+            if ku_ext+1 >= ku_int || kv_ext+1 >= kv_int
+                empty!(pre_active_nodes)
+                empty!(active_nodes)
+                for i in keys(g)
+                    if m[i] == u_comm || m[i] == v_comm
+                        push!(pre_active_nodes, i)
+                        push!(active_nodes, i)
+                        m[i] = i
+                    end
+                end
+                addedge!(g, u, v)
+                pre_update!(g, m, c, pre_active_nodes, active_nodes)
+                return update!(g, m, c, active_nodes)
+            else
+                addedge!(g, u, v)
+            end
+        else
+            addedge!(g, u, v)
         end
-        addedge!(g, u, v)
-    	#all_active_nodes = copy(active_nodes)
-    	pre_update!(g, m, c, pre_active_nodes, active_nodes)
-        return update!(g, m, c, active_nodes)
-      else
-      	addedge!(g, u, v)
-        return 0
-      end
-  else
-      return 0
-  end
+    end
+    return 0
 end
 
 function lpa_deleteedge!(g, m, c, u, v, pre_active_nodes, active_nodes)
