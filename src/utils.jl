@@ -14,3 +14,10 @@ function modularity(g, c)
 	Q = s1/m - s2/m^2
 	return Q
 end
+
+function range_shuffle!(r::Integer, a::AbstractVector)
+    @inbounds for i=r:-1:2
+        j = StatsBase.randi(i)
+        a[i], a[j] = a[j], a[i]
+    end
+end

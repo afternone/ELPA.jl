@@ -30,29 +30,18 @@ function deleteedge!{V,W}(g::Graph{V,W}, u::V, v::V)
 end
 
 function ne{V,W}(g::Graph{V,W})
-	m = 0
-	for u in keys(g)
-		m += length(g[u])
-	end
-	return div(m, 2)
+    m = 0
+    for u in keys(g)
+        m += length(g[u])
+    end
+    return div(m, 2)
 end
 
 """Type to record neighbor labels and their counts."""
 type NeighComm
-  neigh_pos::Vector{Int}
-  neigh_cnt::Vector{Int}
-  neigh_last::Int
-end
-
-"""Fast shuffle Array `a` in UnitRange `r` inplace."""
-function range_shuffle!(r::UnitRange, a::AbstractVector)
-    (r.start > 0 && r.stop <= length(a)) || error("out of bounds")
-    @inbounds for i=length(r):-1:2
-        j = rand(1:i)
-        ii = i + r.start - 1
-        jj = j + r.start - 1
-        a[ii],a[jj] = a[jj],a[ii]
-    end
+    neigh_pos::Vector{Int}
+    neigh_cnt::Vector{Int}
+    neigh_last::Int
 end
 
 function range_shuffle!(r, a::AbstractVector)
@@ -82,38 +71,38 @@ function pre_vote!(g, m, c::NeighComm, u, all_active_nodes)
             end
             c.neigh_cnt[neigh_comm] += 1
             if c.neigh_cnt[neigh_comm] > max_cnt
-              max_cnt = c.neigh_cnt[neigh_comm]
+                max_cnt = c.neigh_cnt[neigh_comm]
             end
         end
     end
     # ties breaking randomly
     range_shuffle!(c.neigh_last-1, c.neigh_pos)
     for lbl in c.neigh_pos
-      if c.neigh_cnt[lbl] == max_cnt
-        return lbl
-      end
+        if c.neigh_cnt[lbl] == max_cnt
+            return lbl
+        end
     end
 end
 
 function pre_update!(g, m, c::NeighComm, active_nodes, all_active_nodes)
-  while !isempty(active_nodes)
-    random_order = collect(active_nodes)
-    shuffle!(random_order)
-    for u in random_order
-      old_comm = m[u]
-      new_comm = pre_vote!(g, m, c, u, all_active_nodes)
-      if new_comm != old_comm
-        for v in keys(g[u])
-		  if in(v, all_active_nodes)
-	          push!(active_nodes, v)
-	          m[u] = new_comm
-		  end
+    while !isempty(active_nodes)
+        random_order = collect(active_nodes)
+        shuffle!(random_order)
+        for u in random_order
+            old_comm = m[u]
+            new_comm = pre_vote!(g, m, c, u, all_active_nodes)
+            if new_comm != old_comm
+                for v in keys(g[u])
+                    if in(v, all_active_nodes)
+                        push!(active_nodes, v)
+                        m[u] = new_comm
+                    end
+                end
+            else
+                delete!(active_nodes, u)
+            end
         end
-      else
-        delete!(active_nodes, u)
-      end
     end
-  end
 end
 
 """Return the most frequency label."""
@@ -135,71 +124,70 @@ function vote!(g, m, c::NeighComm, u)
         end
         c.neigh_cnt[neigh_comm] += 1
         if c.neigh_cnt[neigh_comm] > max_cnt
-          max_cnt = c.neigh_cnt[neigh_comm]
+            max_cnt = c.neigh_cnt[neigh_comm]
         end
     end
     # ties breaking randomly
     range_shuffle!(c.neigh_last-1, c.neigh_pos)
     for lbl in c.neigh_pos
-      if c.neigh_cnt[lbl] == max_cnt
-        return lbl
-      end
+        if c.neigh_cnt[lbl] == max_cnt
+            return lbl
+        end
     end
 end
 
 function update!(g, m, c::NeighComm, active_nodes)
-  num_active_nodes = 0
-  while !isempty(active_nodes)
-    if length(active_nodes) > num_active_nodes
-        num_active_nodes = length(active_nodes)
-    end
-    random_order = collect(active_nodes)
-    shuffle!(random_order)
-    for u in random_order
-      old_comm = m[u]
-      new_comm = vote!(g, m, c, u)
-      if new_comm != old_comm
-        for v in keys(g[u])
-          push!(active_nodes, v)
-          m[u] = new_comm
+    num_active_nodes = 0
+    while !isempty(active_nodes)
+        if length(active_nodes) > num_active_nodes
+            num_active_nodes = length(active_nodes)
         end
-      else
-        delete!(active_nodes, u)
-      end
+        random_order = collect(active_nodes)
+        shuffle!(random_order)
+        for u in random_order
+            old_comm = m[u]
+            new_comm = vote!(g, m, c, u)
+            if new_comm != old_comm
+                for v in keys(g[u])
+                    push!(active_nodes, v)
+                    m[u] = new_comm
+                end
+            else
+                delete!(active_nodes, u)
+            end
+        end
     end
-  end
-  num_active_nodes
+    num_active_nodes
 end
 
 function lpa_addnode!(g, m, u)
-  if !haskey(g, u)
-    addnode!(g, u)
-    m[u] = u
-  end
+    if !haskey(g, u)
+        addnode!(g, u)
+        m[u] = u
+    end
 end
 
 function lpa_deletenode!(g, m, c, u, active_lbls, pre_active_nodes, active_nodes)
-  if haskey(g, u)
-      empty!(pre_active_nodes)
-      empty!(active_nodes)
-      empty!(active_lbls)
-      for v in keys(g[u])
-        push!(active_lbls, m[v])
-      end
-      deletenode!(g, u)
-      delete!(m, u)
-      for v in keys(g)
-        if in(m[v], active_lbls)
-          push!(pre_active_nodes, v)
-          push!(active_nodes, v)
-          m[v] = v
+    if haskey(g, u)
+        empty!(pre_active_nodes)
+        empty!(active_nodes)
+        empty!(active_lbls)
+        for v in keys(g[u])
+            push!(active_lbls, m[v])
         end
-      end
-      pre_update!(g, m, c, pre_active_nodes, active_nodes)
-      return update!(g, m, c, active_nodes)
-  else
-      return 0
-  end
+        deletenode!(g, u)
+        delete!(m, u)
+        for v in keys(g)
+            if in(m[v], active_lbls)
+                push!(pre_active_nodes, v)
+                push!(active_nodes, v)
+                m[v] = v
+            end
+        end
+        pre_update!(g, m, c, pre_active_nodes, active_nodes)
+        return update!(g, m, c, active_nodes)
+    end
+    return 0
 end
 
 function lpa_addedge!(g, m, c, u, v, pre_active_nodes, active_nodes)
@@ -231,7 +219,8 @@ function lpa_addedge!(g, m, c, u, v, pre_active_nodes, active_nodes)
                 empty!(pre_active_nodes)
                 empty!(active_nodes)
                 for i in keys(g)
-                    if m[i] == u_comm || m[i] == v_comm
+                    i_comm = m[i]
+                    if i_comm == u_comm || i_comm == v_comm
                         push!(pre_active_nodes, i)
                         push!(active_nodes, i)
                         m[i] = i
@@ -251,29 +240,27 @@ function lpa_addedge!(g, m, c, u, v, pre_active_nodes, active_nodes)
 end
 
 function lpa_deleteedge!(g, m, c, u, v, pre_active_nodes, active_nodes)
-  if haskey(g, u) && haskey(g[u], v)
-      empty!(pre_active_nodes)
-      empty!(active_nodes)
-      #active_nodes = Set{keytype(g)}()
-      if m[u] == m[v]
-        for i in keys(g)
-          if m[i] == m[u]
-            push!(pre_active_nodes, i)
-            push!(active_nodes, i)
-            m[i] = i
-          end
+    if haskey(g, u) && haskey(g[u], v)
+        u_comm = m[u]
+        v_comm = m[v]
+        if u_comm == v_comm
+            empty!(pre_active_nodes)
+            empty!(active_nodes)
+            for i in keys(g)
+                if m[i] == u_comm
+                    push!(pre_active_nodes, i)
+                    push!(active_nodes, i)
+                    m[i] = i
+                end
+            end
+            deleteedge!(g, u, v)
+            pre_update!(g, m, c, pre_active_nodes, active_nodes)
+            return update!(g, m, c, active_nodes)
+        else
+            deleteedge!(g, u, v)
         end
-        deleteedge!(g, u, v)
-    	#all_active_nodes = copy(active_nodes)
-    	pre_update!(g, m, c, pre_active_nodes, active_nodes)
-        return update!(g, m, c, active_nodes)
-      else
-      	deleteedge!(g, u, v)
-        return 0
-      end
-  else
-      return 0
-  end
+    end
+    return 0
 end
 
 using ParserCombinator: Parsers.GML
@@ -291,20 +278,20 @@ end
 function loadgml(gname::AbstractString)
     p = GML.parse_dict(readall(gname))
     for gs in p[:graph]
-		return _gml_read_one_graph(gs)
+        return _gml_read_one_graph(gs)
     end
     error("Graph $gname not found")
 end
 
 function savegml(gname::AbstractString, g, c=Vector{Integer}())
-	io = open(gname, "w")
+    io = open(gname, "w")
     println(io, "graph")
     println(io, "[")
     println(io, "directed 0")
     i = 0
     nodemap = Dict{Int,Int}()
     for u in keys(g)
-    	nodemap[u] = i
+        nodemap[u] = i
         println(io,"\tnode")
         println(io,"\t[")
         println(io,"\t\tid $i")
@@ -314,15 +301,15 @@ function savegml(gname::AbstractString, g, c=Vector{Integer}())
         i += 1
     end
     for u in keys(g)
-    	for v in keys(g[u])
-    		if u < v
-		        println(io,"\tedge")
-		        println(io,"\t[")
-		        println(io,"\t\tsource $(nodemap[u])")
-		        println(io,"\t\ttarget $(nodemap[v])")
-		        println(io,"\t]")
-		    end
-		end
+        for v in keys(g[u])
+            if u < v
+                println(io,"\tedge")
+                println(io,"\t[")
+                println(io,"\t\tsource $(nodemap[u])")
+                println(io,"\t\ttarget $(nodemap[v])")
+                println(io,"\t]")
+            end
+        end
     end
     println(io, "]")
     close(io)
