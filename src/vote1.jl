@@ -1,3 +1,52 @@
+using StatsBase
+
+typealias  Graph Dict{Int, Set{Int}}
+
+function addnode!(g::Graph, u::Int)
+    if !haskey(g, u)
+        g[u] = valtype(g)()
+    end
+    nothing
+end
+
+function delnode!(g::Graph, u::Int)
+    if haskey(g, u)
+        for v in g[u]
+            delete!(g[v], u)
+        end
+        delete!(g, u)
+    end
+    nothing
+end
+
+function addedge!(g::Graph, u::Int, v::Int)
+    addnode!(g, u)
+    addnode!(g, v)
+    push!(g[u], v)
+    push!(g[v], u)
+    nothing
+end
+
+function deledge!(g::Graph, u::Int, v::Int)
+    if haskey(g, u) && haskey(g, v)
+        delete!(g[u], v)
+        delete!(g[v], u)
+    end
+    nothing
+end
+
+function ne(g::Graph)
+    m = 0
+    for u in keys(g)
+        m += length(g[u])
+    end
+    return div(m, 2)
+end
+
+neighbors(g::Graph, u::Int) = g[u]
+
+nodes(g::Graph, u::Int) = keys(g)
+
 """Type to record neighbor labels and their counts."""
 type NeighComm
     neigh_pos::Vector{Int}
@@ -5,13 +54,15 @@ type NeighComm
     neigh_last::Int
 end
 
-type NodeStatus
-    neigh_pos::Vector{Int}
-    neigh_cnt::Vector{Bool}
-    neigh_last::Int
+function range_shuffle!(r, a::AbstractVector)
+    @inbounds for i=r:-1:2
+        j = StatsBase.randi(i)
+        a[i],a[j] = a[j],a[i]
+    end
 end
 
-function pre_vote!(g, m, c::NeighComm, u, nodes_int)
+"""Return the most frequency label."""
+function pre_vote!(g, m, c::NeighComm, u, all_active_nodes)
     @inbounds for i=1:c.neigh_last-1
         c.neigh_cnt[c.neigh_pos[i]] = -1
     end
@@ -20,9 +71,8 @@ function pre_vote!(g, m, c::NeighComm, u, nodes_int)
     c.neigh_cnt[c.neigh_pos[1]] = 0
     c.neigh_last = 2
     max_cnt = 0
-    for neigh in g[u]
-        # If in community
-        if nodes_int[neigh]
+    for neigh in neighbors(g,u)
+        if in(neigh, all_active_nodes)
             neigh_comm = m[neigh]
             if c.neigh_cnt[neigh_comm] < 0
                 c.neigh_cnt[neigh_comm] = 0
@@ -44,23 +94,16 @@ function pre_vote!(g, m, c::NeighComm, u, nodes_int)
     end
 end
 
-function pre_update!(g, m, c::NeighComm, active_nodes, nodes_int, random_order)
+function pre_update!(g, m, c::NeighComm, active_nodes, all_active_nodes)
     while !isempty(active_nodes)
-        #random_order = collect(active_nodes)
-        i = 0
-        for u in active_nodes
-            i += 1
-            random_order[i] = u
-        end
-        #shuffle!(random_order)
-        range_shuffle!(i, random_order)
-        for j=1:i
-            u = random_order[j]
+        random_order = collect(active_nodes)
+        shuffle!(random_order)
+        for u in random_order
             old_comm = m[u]
-            new_comm = pre_vote!(g, m, c, u, nodes_int)
+            new_comm = pre_vote!(g, m, c, u, all_active_nodes)
             if new_comm != old_comm
-                for v in g[u]
-                    if nodes_int[v]
+                for v in neighbors(g,u)
+                    if in(v, all_active_nodes)
                         push!(active_nodes, v)
                         m[u] = new_comm
                     end
@@ -82,7 +125,7 @@ function vote!(g, m, c::NeighComm, u)
     c.neigh_cnt[c.neigh_pos[1]] = 0
     c.neigh_last = 2
     max_cnt = 0
-    for neigh in g[u]
+    for neigh in neighbors(g,u)
         neigh_comm = m[neigh]
         if c.neigh_cnt[neigh_comm] < 0
             c.neigh_cnt[neigh_comm] = 0
@@ -103,26 +146,19 @@ function vote!(g, m, c::NeighComm, u)
     end
 end
 
-function update!(g, m, c::NeighComm, active_nodes, random_order)
+function update!(g, m, c::NeighComm, active_nodes)
     num_active_nodes = 0
     while !isempty(active_nodes)
         if length(active_nodes) > num_active_nodes
             num_active_nodes = length(active_nodes)
         end
-        #random_order = collect(active_nodes)
-        i = 0
-        for u in active_nodes
-            i += 1
-            random_order[i] = u
-        end
-        #shuffle!(random_order)
-        range_shuffle!(i, random_order)
-        for j=1:i
-            u = random_order[j]
+        random_order = collect(active_nodes)
+        shuffle!(random_order)
+        for u in random_order
             old_comm = m[u]
             new_comm = vote!(g, m, c, u)
             if new_comm != old_comm
-                for v in g[u]
+                for v in neighbors(g,u)
                     push!(active_nodes, v)
                     m[u] = new_comm
                 end
@@ -141,33 +177,30 @@ function lpa_addnode!(g, m, u)
     end
 end
 
-function lpa_deletenode!(g, m, c, u, active_nodes, nodes_int, random_order)
+function lpa_deletenode!(g, m, c, u, active_lbls, pre_active_nodes, active_nodes)
     if haskey(g, u)
+        empty!(pre_active_nodes)
         empty!(active_nodes)
-        u_comm = m[u]
+        empty!(active_lbls)
+        for v in neighbors(g,u)
+            push!(active_lbls, m[v])
+        end
         deletenode!(g, u)
         delete!(m, u)
-        nodes_int.neigh_last = 0
-        for v in keys(g)
-            if m[v] == u_comm
+        for v in nodes(g)
+            if in(m[v], active_lbls)
+                push!(pre_active_nodes, v)
                 push!(active_nodes, v)
-                nodes_int.neigh_last += 1
-                nodes_int.neigh_pos[nodes_int.neigh_last] = v
-                nodes_int.neigh_cnt[v] = true
                 m[v] = v
             end
         end
-        pre_update!(g, m, c, active_nodes, nodes_int.neigh_cnt, random_order)
-        num_active = update!(g, m, c, active_nodes, random_order)
-        for i=1:nodes_int.neigh_last
-            nodes_int.neigh_cnt[nodes_int.neigh_pos[i]] = false
-        end
-        return num_active
+        pre_update!(g, m, c, pre_active_nodes, active_nodes)
+        return update!(g, m, c, active_nodes)
     end
     return 0
 end
 
-function lpa_addedge!(g, m, c, u, v, active_nodes, nodes_int, random_order)
+function lpa_addedge!(g, m, c, u, v, pre_active_nodes, active_nodes)
     lpa_addnode!(g, m, u)
     lpa_addnode!(g, m, v)
     if !in(v, g[u])
@@ -178,14 +211,14 @@ function lpa_addedge!(g, m, c, u, v, active_nodes, nodes_int, random_order)
             ku_ext = 0
             kv_int = 0
             kv_ext = 0
-            for neigh in g[u]
+            for neigh in neighbors(g,u)
                 if m[neigh] == u_comm
                     ku_int += 1
                 else
                     ku_ext += 1
                 end
             end
-            for neigh in g[v]
+            for neigh in neighbors(g,v)
                 if m[neigh] == v_comm
                     kv_int += 1
                 else
@@ -193,25 +226,19 @@ function lpa_addedge!(g, m, c, u, v, active_nodes, nodes_int, random_order)
                 end
             end
             if ku_ext+1 >= ku_int || kv_ext+1 >= kv_int
+                empty!(pre_active_nodes)
                 empty!(active_nodes)
-                nodes_int.neigh_last = 0
-                for i in keys(g)
+                for i in nodes(g)
                     i_comm = m[i]
                     if i_comm == u_comm || i_comm == v_comm
+                        push!(pre_active_nodes, i)
                         push!(active_nodes, i)
-                        nodes_int.neigh_last += 1
-                        nodes_int.neigh_pos[nodes_int.neigh_last] = i
-                        nodes_int.neigh_cnt[i] = true
                         m[i] = i
                     end
                 end
                 addedge!(g, u, v)
-                pre_update!(g, m, c, active_nodes, nodes_int.neigh_cnt, random_order)
-                num_active = update!(g, m, c, active_nodes, random_order)
-                for i=1:nodes_int.neigh_last
-                    nodes_int.neigh_cnt[nodes_int.neigh_pos[i]] = false
-                end
-                return num_active
+                pre_update!(g, m, c, pre_active_nodes, active_nodes)
+                return update!(g, m, c, active_nodes)
             else
                 addedge!(g, u, v)
             end
@@ -222,32 +249,79 @@ function lpa_addedge!(g, m, c, u, v, active_nodes, nodes_int, random_order)
     return 0
 end
 
-function lpa_deleteedge!(g, m, c, u, v, active_nodes, nodes_int, random_order)
+function lpa_deleteedge!(g, m, c, u, v, pre_active_nodes, active_nodes)
     if haskey(g, u) && haskey(g[u], v)
         u_comm = m[u]
         v_comm = m[v]
         if u_comm == v_comm
+            empty!(pre_active_nodes)
             empty!(active_nodes)
-            nodes_int.neigh_last = 0
-            for i in keys(g)
+            for i in nodes(g)
                 if m[i] == u_comm
+                    push!(pre_active_nodes, i)
                     push!(active_nodes, i)
-                    nodes_int.neigh_last += 1
-                    nodes_int.neigh_pos[nodes_int.neigh_last] = i
-                    nodes_int.neigh_cnt[i] = true
                     m[i] = i
                 end
             end
             deleteedge!(g, u, v)
-            pre_update!(g, m, c, active_nodes, nodes_int.neigh_cnt, random_order)
-            num_active = update!(g, m, c, active_nodes, random_order)
-            for i=1:nodes_int.neigh_last
-                nodes_int.neigh_cnt[nodes_int.neigh_pos[i]] = false
-            end
-            return num_active
+            pre_update!(g, m, c, pre_active_nodes, active_nodes)
+            return update!(g, m, c, active_nodes)
         else
             deleteedge!(g, u, v)
         end
     end
     return 0
+end
+
+using ParserCombinator: Parsers.GML
+
+function _gml_read_one_graph(gs)
+    nodes = [x[:id] for x in gs[:node]]
+    g = Graph{Int,Int}()
+    sds = [(Int(x[:source]), Int(x[:target])) for x in gs[:edge]]
+    for (s,d) in (sds)
+        addedge!(g, s, d)
+    end
+    return g
+end
+
+function loadgml(gname::AbstractString)
+    p = GML.parse_dict(readall(gname))
+    for gs in p[:graph]
+        return _gml_read_one_graph(gs)
+    end
+    error("Graph $gname not found")
+end
+
+function savegml(gname::AbstractString, g, c=Vector{Integer}())
+    io = open(gname, "w")
+    println(io, "graph")
+    println(io, "[")
+    println(io, "directed 0")
+    i = 0
+    nodemap = Dict{Int,Int}()
+    for u in keys(g)
+        nodemap[u] = i
+        println(io,"\tnode")
+        println(io,"\t[")
+        println(io,"\t\tid $i")
+        println(io,"\t\tlabel $u")
+        length(c) > 0 && println(io,"\t\tvalue $(c[u])")
+        println(io,"\t]")
+        i += 1
+    end
+    for u in keys(g)
+        for v in keys(g[u])
+            if u < v
+                println(io,"\tedge")
+                println(io,"\t[")
+                println(io,"\t\tsource $(nodemap[u])")
+                println(io,"\t\ttarget $(nodemap[v])")
+                println(io,"\t]")
+            end
+        end
+    end
+    println(io, "]")
+    close(io)
+    return 1
 end
