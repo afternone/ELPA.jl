@@ -371,3 +371,45 @@ function savegml(gname::AbstractString, g, c=Vector{Integer}())
     close(io)
     return 1
 end
+
+function graphdiff(g1::Graph, g2::Graph)
+    new_edges = Set{Pair{Int,Int}}()
+    for u in nodes(g1)
+        for v in neighbors(g1,u)
+            if u<=v
+                push!(new_edges, Pair(u,v))
+            end
+        end
+    end
+    for u in nodes(g2)
+        for v in neighbors(g2,u)
+            if u<=v
+                delete!(new_edges, Pair(u,v))
+            end
+        end
+    end
+    new_edges
+end
+
+function graphdiff(graph1, graph2)
+    edges_g1 = readdlm(graph1, Int)
+    edges_g2 = readdlm(graph2, Int)
+    new_edges = Set{Pair{Int,Int}}()
+    for i=1:size(edges_g1, 1)
+        u = edges_g1[i,1]
+        v = edges_g1[i,2]
+        if u>v
+            u,v = v,u
+        end
+        push!(new_edges, Pair(u,v))
+    end
+    for i=1:size(edges_g2, 1)
+        u = edges_g2[i,1]
+        v = edges_g2[i,2]
+        if u>v
+            u,v = v,u
+        end
+        delete!(new_edges, Pair(u,v))
+    end
+    new_edges
+end
