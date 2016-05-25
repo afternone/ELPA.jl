@@ -415,6 +415,8 @@ function graphdiff(graph1, graph2)
 end
 
 function modularity(g, c)
+    labels = unique(c)
+    length(labels) == 1 && return 0.0
     no_of_edges = ne(g)
     m = 0
     e = Dict{Int,Int}()
@@ -433,10 +435,9 @@ function modularity(g, c)
             end
         end
     end
-
     modularity_value = 0.0
     if m > 0
-        for i in c
+        for i in labels
             if i > 0
                 tmp = haskey(a,i) ? a[i]/2/m : 0
                 modularity_value += haskey(e,i) ? e[i]/2/m : 0
@@ -445,21 +446,4 @@ function modularity(g, c)
         end
     end
     modularity_value
-end
-
-function modularity1(g, c)
-	Q = 0.
-	m = 2*ne(g)
-	m == 0 && return 0.
-	s1 = 0
-	s2 = 0
-	for u in keys(g)
-		for v in keys(g)
-			c[u] != c[v] && continue
-			s1 += in(v, g[u]) ? 1 : 0
-			s2 += length(g[u])*length(g[v])
-		end
-	end
-	Q = s1/m - s2/m^2
-	return Q
 end
