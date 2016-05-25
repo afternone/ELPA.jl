@@ -415,20 +415,34 @@ function graphdiff(graph1, graph2)
 end
 
 function modularity(g, c)
-	Q = 0.
-	m = 2*ne(g)
-	m == 0 && return 0.
-	s1 = 0
-	s2 = 0
-	for u in nodes(g)
+    no_of_edges = ne(g)
+    m = 0
+    e = Dict{Int,Int}()
+    a = Dict{Int,Int}()
+    m = no_of_edges
+    for u in nodes(g)
         for v in neighbors(g,u)
-			c[u] != c[v] && continue
-			s1 += 1
-			s2 += length(g[u])*length(g[v])
-		end
-	end
-	Q = s1/m - s2/m^2
-	return Q
+            if u<v
+                c1 = c[u]
+                c2 = c[v]
+                if c1 == c2
+                    e[c1] = get(e,c1,0) + 2
+                end
+                a[c1] = get(a,c1,0) + 1
+                a[c2] = get(a,c2,0) + 1
+            end
+        end
+    end
+
+    modularity_value = 0.0
+    if m > 0
+        for i in values(c)
+            tmp = haskey(c,i) ? a[i]/2/m : 0
+            modularity_value += haskey(e,i) ? e[i]/2/m : 0
+            modularity_value -= tmp*tmp
+        end
+    end
+    modularity_value
 end
 
 function modularity1(g, c)
