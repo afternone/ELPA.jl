@@ -437,9 +437,11 @@ function modularity(g, c)
     modularity_value = 0.0
     if m > 0
         for i in c
-            tmp = haskey(a,i) ? a[i]/2/m : 0
-            modularity_value += haskey(e,i) ? e[i]/2/m : 0
-            modularity_value -= tmp*tmp
+            if i > 0
+                tmp = haskey(a,i) ? a[i]/2/m : 0
+                modularity_value += haskey(e,i) ? e[i]/2/m : 0
+                modularity_value -= tmp*tmp
+            end
         end
     end
     modularity_value
